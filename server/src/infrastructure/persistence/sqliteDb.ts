@@ -1,15 +1,12 @@
 import Database from "better-sqlite3";
 import path from "path";
 
-// Creamos o abrimos el archivo local de SQLite en la raíz del proyecto
 const dbPath = path.resolve(process.cwd(), "cold_chain.db");
 export const db = new Database(dbPath);
 
-// Configuramos SQLite para máxima velocidad en escrituras (Modo WAL)
 db.pragma("journal_mode = WAL");
 db.pragma("synchronous = NORMAL");
 
-// 1. Inicializamos la tabla de telemetría si no existe
 db.prepare(
   `
   CREATE TABLE IF NOT EXISTS telemetry (
@@ -26,7 +23,6 @@ db.prepare(
 `,
 ).run();
 
-// 2. Creamos el Índice Compuesto para búsquedas ultra rápidas por dispositivo y tiempo
 db.prepare(
   `
   CREATE INDEX IF NOT EXISTS idx_telemetry_device_timestamp 
@@ -34,8 +30,74 @@ db.prepare(
 `,
 ).run();
 
-console.log(`💾 Base de datos SQLite inicializada exitosamente.`);
-console.log(`📍 Archivo de BD: ${dbPath}`);
-console.log(
-  `⚡ Índice compuesto 'idx_telemetry_device_timestamp' configurado.`,
-);
+db.prepare(
+  `
+  CREATE TABLE IF NOT EXISTS alerts (
+    alertId INTEGER PRIMARY KEY AUTOINCREMENT,
+    deviceId TEXT NOT NULL,
+    state TEXT NOT NULL CHECK(state IN ('ACTIVE', 'ACKNOWLEDGED', 'RESOLVED')),
+    triggerValue REAL NOT NULL,
+    startedAt TEXT NOT NULL,
+    acknowledgedAt TEXT NULL,
+    resolvedAt TEXT NULL,
+    createdAt TEXT NOT NULL
+  )
+`,
+).run();
+
+db.prepare(
+  `
+  CREATE TABLE IF NOT EXISTS device_configs (
+    deviceId TEXT PRIMARY KEY,
+    minTemp REAL NOT NULL,
+    maxTemp REAL NOT NULL,
+    windowMinutes INTEGER NOT NULL,
+    intervalSeconds INTEGER NOT NULL,
+    minRequiredOkPercentage REAL NOT NULL
+  )
+`,
+).run();
+
+db.prepare(
+  `
+  CREATE INDEX IF NOT EXISTS idx_telemetry_device_timestamp 
+  ON telemetry (deviceId, timestamp DESC);
+`,
+).run();
+
+db.prepare(
+  `
+  CREATE INDEX IF NOT EXISTS idx_alerts_device_state 
+  ON alerts (deviceId, state);
+`,
+).run();
+
+try {
+  const checkConfig = db.prepare(
+    `SELECT COUNT(*) as count FROM device_configs`,
+  );
+  const result = checkConfig.get() as { count: number };
+
+  if (result.count === 0) {
+    const insertConfig = db.prepare(`
+      INSERT INTO device_configs 
+      (deviceId, minTemp, maxTemp, windowMinutes, intervalSeconds, minRequiredOkPercentage)
+      VALUES (?, ?, ?, ?, ?, ?)
+    `);
+
+    insertConfig.run(
+      "shipment-alan-morgado", // deviceId
+      5.0, // tempMin
+      7.0, // tempMax
+      2, // windowMinutes
+      15, // intervalSeconds
+      60.0, // minRequiredOkPercentage (80% de las lecturas deben estar BIEN)
+    );
+
+    console.log(`Initial config for 'shipment-alan-morgado'.`);
+  }
+} catch (error) {
+  console.error("Error on SQLite script:", error);
+}
+
+console.log(`Success creating DB`);

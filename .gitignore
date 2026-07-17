@@ -40,4 +40,4 @@ temp/
 # sqlite database
 # ==========================
 *.db
-
+*.db*

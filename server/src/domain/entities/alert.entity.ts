@@ -1,11 +1,16 @@
-export type AlertState = "ACTIVE" | "ACKNOWLEDGED" | "RESOLVED";
+export enum AlertState {
+  ACTIVE = "ACTIVE",
+  ACKNOWLEDGED = "ACKNOWLEDGED",
+  RESOLVED = "RESOLVED",
+}
 
 export interface Alert {
-  id: string;
+  alertId?: number;
   deviceId: string;
   state: AlertState;
-  temperatureThreshold: number;
+  triggerValue: number;
   startedAt: Date;
-  acknowledgedAt?: Date;
-  resolvedAt?: Date;
+  acknowledgedAt?: Date | null;
+  resolvedAt?: Date | null;
+  createdAt: Date;
 }

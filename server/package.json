@@ -5,7 +5,7 @@
   "main": "index.js",
   "scripts": {
     "build": "tsc",
-    "dev": "ts-node src/index.ts",
+    "dev": "ts-node src/server.ts",
     "test-listener": "ts-node src/testListener.ts"
   },
   "keywords": [],
