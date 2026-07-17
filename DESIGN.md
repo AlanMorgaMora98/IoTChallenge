@@ -2,9 +2,9 @@
 
 # ASSUMPTIONS
 
-- **Device names are unique** by default and should not be modified. This ensures consistency across the databases that store telemetry data and alert reports.
+- **Device names are unique** by default and should not be modified. This ensures consistency across the database that store telemetry data, alert reports and device configuration alerts.
 
-- **Device (agent) has pre-configured alerts by default**.
+- **Device (agent) has pre-configured alerts by default**, if there are no configurations alerts, it will only capture the telemetry.
 
 - The web application is intended exclusively for authenticated and authorized users, such as operators and administrators, who are responsible for monitoring and managing IoT devices
 
@@ -34,7 +34,13 @@ This logic is executed locally by the agent, operating autonomously and activate
 
 > ## Server (Back-end)
 
-Worker server to subscribe to IoThub
+The backend acts as the central integration layer between Azure IoT Hub, the database, and the web application, providing data processing, business logic, and secure access to device information and telemetry.
+
+The backend server is responsible for consuming telemetry data from Azure IoT Hub through its integration with the platform.
+
+The server follows the principles of *Clean Architecture* to ensure a clear separation of concerns between layers. By decoupling the components, new features and changes can be introduced with minimal impact on the rest of the system, making the codebase easier to evolve and maintain.
+
+Additionally, the Repository Pattern was implemented to abstract data access from the business logic. This allows the underlying persistence mechanism to be replaced or modified (for example, migrating from SQLite to PostgreSQL or another database or even using an ORM) without affecting the application's use cases. As a result, database-related changes remain isolated within the repository layer, preserving the integrity of the domain and application logic while simplifying future maintenance and scalability.
 
 > ## Client (Front-end)
 
@@ -42,7 +48,14 @@ Web app
 
 > ## Database design
 
+SQLite was chosen for this coding exercise due to its lightweight nature, simplicity, and ease of setup. It provides a straightforward solution that minimizes infrastructure requirements while remaining sufficient for the expected workload.
+
+As the volume of telemetry and application data grows, it is recommended to migrate to a more scalable database (maybe a cloud database) solution capable of handling higher write throughput, larger datasets, and increased concurrency. This would improve overall performance, reduce resource consumption on the application server, and better support future scalability requirements
+
+The database diagram:
+
 Database to save alerts, telemetry and devices configurations
+
 
 # SECURITY CONSIDERATIONS
 
@@ -54,13 +67,15 @@ Database to save alerts, telemetry and devices configurations
 
 # SUGGESTIONS AND FUTURE WORK
 
-> - Consider **assigning a default configuration to newly created devices**. This helps prevent null or inconsistent configurations, reducing the risk of bugs and ensuring predictable device behavior from the initial setup.
+ - Consider **assigning a default configuration to newly created devices**. This helps prevent null or inconsistent configurations, reducing the risk of bugs and ensuring predictable device behavior from the initial setup.
 
-    - NOTE: For this challenge, I provided default configurations for the agent.
+    -  NOTE: For this coding exercise, I provided default configurations for the device agent.
 
-> - Allow users to create device groups to **apply configuration changes to multiple devices simultaneously**, eliminating the need to configure each device individually
+ - Allow users to create device groups to **apply configuration changes to multiple devices simultaneously**, eliminating the need to configure each device individually
 
-> - Implement **localization** in the frontend to support multiple languages, time zones, and regional settings
-> - Allow users to **switch between Celsius and Fahrenheit** for temperature display and configuration
 
-> - Implement **predefined critical temperature alerts** that can override the standard evaluation process when an abnormal temperature increase/decrease is detected, should be **triggered immediately when the measured temperature rises rapidly or exceeds a critical threshold**, without waiting for the configured evaluation time to complete
+ - Implement **localization** in the frontend to support multiple languages, time zones, and regional settings
+
+ - Allow users to **switch between Celsius and Fahrenheit** for temperature display and configuration
+
+ - Implement **predefined critical temperature alerts** that can override the standard evaluation process when an abnormal temperature increase/decrease is detected, should be **triggered immediately when the measured temperature rises rapidly or exceeds a critical threshold**, without waiting for the configured evaluation time to complete
