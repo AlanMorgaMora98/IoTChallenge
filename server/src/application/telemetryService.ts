@@ -1,4 +1,4 @@
-import { TelemetryReading } from "../domain/entities/index";
+import { TelemetryReading } from "../domain/entities";
 
 export class TelemetryService {
   // Almacén en memoria temporal para ver el histórico de lecturas que entran
