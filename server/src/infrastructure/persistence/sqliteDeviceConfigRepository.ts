@@ -51,4 +51,27 @@ export class SqliteDeviceConfigRepository implements IDeviceConfigRepository {
       `New configuration for device: '${config.deviceId}' saved in db.`,
     );
   }
+
+  public async update(config: DeviceConfig): Promise<void> {
+    const query = db.prepare(`
+      INSERT INTO device_configs (
+        deviceId, minTemp, maxTemp, windowMinutes, intervalSeconds, minRequiredOkPercentage
+      ) VALUES (?, ?, ?, ?, ?, ?)
+      ON CONFLICT(deviceId) DO UPDATE SET
+        minTemp = excluded.minTemp,
+        maxTemp = excluded.maxTemp,
+        windowMinutes = excluded.windowMinutes,
+        intervalSeconds = excluded.intervalSeconds,
+        minRequiredOkPercentage = excluded.minRequiredOkPercentage
+    `);
+
+    query.run(
+      config.deviceId,
+      config.minTemp,
+      config.maxTemp,
+      config.windowMinutes,
+      config.intervalSeconds,
+      config.minRequiredOkPercentage,
+    );
+  }
 }
