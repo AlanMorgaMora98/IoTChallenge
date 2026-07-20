@@ -1,5 +1,10 @@
 import "dotenv/config";
 import express from "express";
+import cors from "cors";
+
+//ROUTES
+import { deviceRoutes } from "./infrastructure/api/routes/device.routes";
+
 import { SqliteTelemetryRepository } from "./infrastructure/persistence/sqliteTelemetryRepository";
 import { SqliteAlertRepository } from "./infrastructure/persistence/sqliteAlertRepository";
 import { SqliteDeviceConfigRepository } from "./infrastructure/persistence/sqliteDeviceConfigRepository";
@@ -9,7 +14,10 @@ import { AzureIoTHubListener } from "./infrastructure/messaging/azureIoTHubListe
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+app.use(cors());
 app.use(express.json());
+
+app.use("/iot", deviceRoutes);
 
 const telemetryRepo = new SqliteTelemetryRepository();
 const alertRepo = new SqliteAlertRepository();

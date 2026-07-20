@@ -1,18 +1,19 @@
-import { Registry } from "azure-iothub";
+import { Registry, Client } from "azure-iothub";
 import { IDeviceTwinService } from "../../domain/services/deviceTwinService.interface";
 
 export class AzureTwinService implements IDeviceTwinService {
   private registry: Registry;
+  private serviceClient: Client;
 
   constructor() {
-    const connectionString =
-      process.env.IOTHUB_EVENTHUB_CONNECTION_STRING || "";
+    const connectionString = process.env.IOTHUB_CONNECTION_STRING || "";
 
     if (!connectionString) {
-      console.warn("provide your IOTHUB_EVENTHUB_CONNECTION_STRING to connect");
+      console.warn("provide your IOTHUB_CONNECTION_STRING to connect");
     }
 
     this.registry = Registry.fromConnectionString(connectionString);
+    this.serviceClient = Client.fromConnectionString(connectionString);
   }
 
   public async updateDesiredProperties(
@@ -27,18 +28,14 @@ export class AzureTwinService implements IDeviceTwinService {
   ): Promise<void> {
     try {
       console.log(
-        `🌐 [Azure Twin] Conectando con Azure para actualizar el Twin de '${deviceId}'...`,
+        `[Twin] Connecting to Azure to update the device twin for '${deviceId}'...`,
       );
 
-      // 3. Obtener el Twin actual del dispositivo desde Azure
       const response = await this.registry.getTwin(deviceId);
       const twin = response.responseBody;
-
-      // 4. Estructurar el parche de propiedades deseadas (desired properties)
       const twinPatch = {
         properties: {
           desired: {
-            // Guardamos las reglas dentro de un objeto legible para el emulador C#
             thermostatRules: {
               minTemp: config.minTemp,
               maxTemp: config.maxTemp,
@@ -54,42 +51,100 @@ export class AzureTwinService implements IDeviceTwinService {
       await this.registry.updateTwin(deviceId, twinPatch, twin.etag);
 
       console.log(
-        `✅ [Azure Twin] Desired properties applied to device:'${deviceId}'.`,
+        `✅ [Twin] Desired properties applied to device:'${deviceId}'.`,
       );
     } catch (error: any) {
       console.error(
-        `❌ [Azure Twin] Error al intentar actualizar el Device Twin de '${deviceId}':`,
+        `❌ [Twin] Error updating the device twin for '${deviceId}':`,
         error.message || error,
       );
       throw error;
     }
   }
 
-  public async silenceBuzzer(deviceId: string): Promise<void> {
-    try {
-      console.log(`🌐 [Azure Twin] Silencing buzzer...: ${deviceId}...`);
+  // public async silenceBuzzer(deviceId: string): Promise<void> {
+  //   try {
+  //     console.log(`🌐 [Twin] Silencing buzzer...: ${deviceId}...`);
 
-      const response = await this.registry.getTwin(deviceId);
-      const twin = response.responseBody;
+  //     const response = await this.registry.getTwin(deviceId);
+  //     const twin = response.responseBody;
 
-      const patch = {
-        properties: {
-          desired: {
-            buzzerEnabled: true,
-          },
+  //     const patch = {
+  //       properties: {
+  //         desired: {
+  //           buzzerEnabled: false,
+  //         },
+  //       },
+  //     };
+
+  //     await this.registry.updateTwin(deviceId, patch, twin.etag);
+  //     console.log(`✅ [Twin] Succesful `);
+  //   } catch (error: any) {
+  //     console.error(
+  //       `❌ [Twin] Error al intentar silenciar el buzzer:`,
+  //       error.message,
+  //     );
+  //     throw error;
+  //   }
+  // }
+
+  public async silenceBuzzer(deviceId: string): Promise<any> {
+    console.log(`🌐 [Twin] Silencing buzzer...: ${deviceId}...`);
+
+    const methodParams = {
+      methodName: "silenceBuzzer",
+      payload: { action: "force_silence", requestedBy: "backend_api" },
+      responseTimeoutInSeconds: 15,
+    };
+
+    return new Promise((resolve, reject) => {
+      this.serviceClient.invokeDeviceMethod(
+        deviceId,
+        methodParams,
+        (err: any, result: any) => {
+          if (err) {
+            console.error(
+              `❌ [Direct method] ERROR  on Direct Method 'silenceBuzzer':`,
+              err.message,
+            );
+            return reject(err);
+          }
+
+          console.log(
+            `✅ [Direct method] Immediate hardware response received.`,
+          );
+          resolve(result);
         },
-      };
+      );
+    });
+  }
 
-      await this.registry.updateTwin(deviceId, patch, twin.etag);
-      console.log(
-        `✅ [Azure Twin] Orden de silenciar buzzer enviada con éxito.`,
+  public async getDeviceState(deviceId: string): Promise<any> {
+    console.log(
+      `🌐 [Direct Method] Performing 'getDeviceState' on: ${deviceId}`,
+    );
+
+    const methodParams = {
+      methodName: "getDeviceState",
+      payload: {},
+      responseTimeoutInSeconds: 30,
+    };
+
+    return new Promise((resolve, reject) => {
+      this.serviceClient.invokeDeviceMethod(
+        deviceId,
+        methodParams,
+        (err: any, result: any) => {
+          if (err) {
+            console.error(
+              `❌ [Direct Method] Something went wrong with direct method'getDeviceState':`,
+              err.message,
+            );
+            return reject(err);
+          }
+          resolve(result);
+        },
       );
-    } catch (error: any) {
-      console.error(
-        `❌ [Azure Twin] Error al intentar silenciar el buzzer:`,
-        error.message,
-      );
-      throw error;
-    }
+    });
   }
 }

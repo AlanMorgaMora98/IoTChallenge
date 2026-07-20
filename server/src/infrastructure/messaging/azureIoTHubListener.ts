@@ -21,7 +21,7 @@ export class AzureIoTHubListener {
 
     if (!connectionString) {
       console.warn(
-        "⚠️ [Azure IoT Hub] Advertencia: IOTHUB_EVENT_HUBS_CONNECTION_STRING not defined in .env",
+        "⚠️ [IoT Hub] Not founded: IOTHUB_EVENT_HUBS_CONNECTION_STRING not defined in .env",
       );
     }
 
@@ -46,7 +46,7 @@ export class AzureIoTHubListener {
 
               if (!deviceId) {
                 console.warn(
-                  '⚠️ [Azure IoT Hub] Recibido mensaje sin metadatos de "iothub-connection-device-id". Se ignora.',
+                  '⚠️ [IoT Hub] Recibido mensaje sin metadatos de "iothub-connection-device-id". Se ignora.',
                 );
                 continue;
               }
@@ -56,9 +56,7 @@ export class AzureIoTHubListener {
                   ? JSON.parse(event.body)
                   : event.body;
 
-              console.log(
-                `📥 [Azure IoT Hub] Mensaje recibido de '${deviceId}':`,
-              );
+              console.log(`📥 [IoT Hub] Mensaje recibido de '${deviceId}':`);
               console.log(
                 `   └─ Temp: ${payload.temperatureC}°C | Hum: ${payload.humidityPct}% | Buzzer: ${payload.buzzerActive} | Seq: ${payload.sequenceNumber} | DATETIME | ${payload.timestamp}`,
               );
@@ -77,10 +75,9 @@ export class AzureIoTHubListener {
                 timestamp: deviceTimestamp,
               };
 
-              console.log("GUARDANDO LA TELEMETRIA");
+              console.log("Saving telemetry...");
               await this.telemetryRepo.save(reading);
 
-              // 6. Ejecutar el motor de alertas con la regla de sensibilidad
               await this.alertService.processNewTelemetry(reading);
             } catch (error) {
               console.error(

@@ -3,21 +3,24 @@ import { IDeviceTwinService } from "../../domain/services/deviceTwinService.inte
 export class SilenceBuzzerUseCase {
   constructor(private twinService: IDeviceTwinService) {}
 
-  public async execute(deviceId: string): Promise<void> {
-    console.log(
-      `🚀 [UseCase] Orquestando comando de silencio de buzzer para: ${deviceId}`,
-    );
+  // public async execute(deviceId: string): Promise<void> {
+  //   console.info(
+  //     `[UseCase] Sending buzzer silence command to device: ${deviceId}`,
+  //   );
 
-    if (!deviceId || deviceId.trim() === "") {
-      throw new Error(
-        "El ID del dispositivo es requerido para ejecutar el comando de silencio.",
-      );
-    }
+  //   if (!deviceId || deviceId.trim() === "") {
+  //     throw new Error("The device ID is required to perform");
+  //   }
 
-    await this.twinService.silenceBuzzer(deviceId);
+  //   await this.twinService.silenceBuzzer(deviceId);
 
-    console.log(
-      `🎉 [UseCase] Comando enviado con éxito al servicio de mensajería para '${deviceId}'.`,
-    );
+  //   console.info(
+  //     `[UseCase] Command successfully sent to the messaging service for device '${deviceId}`,
+  //   );
+  // }
+
+  async execute(deviceId: string): Promise<any> {
+    if (!deviceId) throw new Error("ID device required.");
+    return await this.twinService.silenceBuzzer(deviceId);
   }
 }

@@ -9,6 +9,7 @@ export interface IDeviceTwinService {
       minRequiredOkPercentage: number;
     },
   ): Promise<void>;
-
   silenceBuzzer(deviceId: string): Promise<void>;
+  //listDevices(): Promise<any[]>;
+  getDeviceState(deviceId: string): Promise<any>;
 }
