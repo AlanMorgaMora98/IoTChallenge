@@ -136,4 +136,14 @@ export class SqliteTelemetryRepository implements ITelemetryRepository {
       timestamp: new Date(row.timestamp),
     }));
   }
+
+  public async getLatestTimestamp(deviceId: string): Promise<Date | null> {
+    const row = db
+      .prepare(
+        `SELECT MAX(timestamp) as maxTs FROM telemetry WHERE deviceId = ?`,
+      )
+      .get(deviceId) as { maxTs: string | null };
+
+    return row.maxTs ? new Date(row.maxTs) : null;
+  }
 }

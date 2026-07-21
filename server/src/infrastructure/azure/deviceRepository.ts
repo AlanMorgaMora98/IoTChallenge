@@ -8,10 +8,6 @@ export class DeviceRepository implements IDeviceRepository {
   private registry: Registry;
 
   constructor(connectionString?: string) {
-    console.log(
-      "IOTHUB_CONNECTION_STRING:",
-      process.env.IOTHUB_CONNECTION_STRING,
-    );
     const connStr = connectionString || process.env.IOTHUB_CONNECTION_STRING;
     if (!connStr) {
       throw new Error("Connection string variable missing");

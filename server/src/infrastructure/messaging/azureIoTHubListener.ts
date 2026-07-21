@@ -4,6 +4,7 @@ import {
   latestEventPosition,
   ReceivedEventData,
 } from "@azure/event-hubs";
+import { Server } from "socket.io";
 import { ITelemetryRepository } from "../../domain/repositories/telemetryRepository.interface";
 import { AlertService } from "../../application/alertService";
 import { TelemetryReading } from "../../domain/entities";
@@ -12,9 +13,12 @@ export class AzureIoTHubListener {
   private client: EventHubConsumerClient;
   private subscription: any;
 
+  private activeBuzzers: Set<string> = new Set();
+
   constructor(
     private telemetryRepo: ITelemetryRepository,
     private alertService: AlertService,
+    private io: Server,
   ) {
     const connectionString =
       process.env.IOTHUB_EVENT_HUBS_CONNECTION_STRING || "";
@@ -25,11 +29,17 @@ export class AzureIoTHubListener {
       );
     }
 
-    this.alertService;
-
     const consumerGroup = "$Default";
 
     this.client = new EventHubConsumerClient(consumerGroup, connectionString);
+
+    this.io.on("connection", (socket) => {
+      console.log(`[Socket.io] Nuevo cliente conectado: ${socket.id}`);
+      socket.emit(
+        "device:initial_active_buzzers",
+        Array.from(this.activeBuzzers),
+      );
+    });
   }
 
   public startListening(): void {
@@ -77,11 +87,34 @@ export class AzureIoTHubListener {
 
               console.log("Saving telemetry...");
               await this.telemetryRepo.save(reading);
-
               await this.alertService.processNewTelemetry(reading);
+
+              if (reading.buzzerActive) {
+                console.log(
+                  `⚠️ [Socket.io] New alert to socket: ${reading.deviceId}`,
+                );
+
+                this.activeBuzzers.add(reading.deviceId);
+
+                this.io.emit("device:buzzer_alert", {
+                  deviceId: reading.deviceId,
+                  buzzerActive: true,
+                  temperatureC: reading.temperatureC,
+                  timestamp: reading.timestamp,
+                });
+              } else {
+                if (this.activeBuzzers.has(reading.deviceId)) {
+                  this.activeBuzzers.delete(reading.deviceId);
+
+                  this.io.emit("device:buzzer_alert", {
+                    deviceId: reading.deviceId,
+                    buzzerActive: false,
+                  });
+                }
+              }
             } catch (error) {
               console.error(
-                "❌ [Azure IoT Hub] Error al procesar un evento de telemetría individual:",
+                "❌ [Azure IoT Hub] Error handling message:",
                 error,
               );
             }

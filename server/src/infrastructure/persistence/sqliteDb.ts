@@ -88,10 +88,10 @@ try {
     insertConfig.run(
       "shipment-alan-morgado", // deviceId
       5.0, // tempMin
-      7.0, // tempMax
-      2, // windowMinutes
+      8.0, // tempMax
+      3, // windowMinutes
       15, // intervalSeconds
-      60.0, // minRequiredOkPercentage (80% de las lecturas deben estar BIEN)
+      75.0, // minRequiredOkPercentage
     );
 
     console.log(`Initial config for 'shipment-alan-morgado'.`);

@@ -8,5 +8,10 @@ export interface ITelemetryRepository {
     deviceId: string,
     daysLimit: number,
   ): Promise<TelemetryReading[]>;
+  getRecentReadings(
+    deviceId: string,
+    limit: number,
+  ): Promise<TelemetryReading[]>;
   getReadingsSince(deviceId: string, since: Date): Promise<TelemetryReading[]>;
+  getLatestTimestamp(deviceId: string): Promise<Date | null>;
 }

@@ -1,7 +1,8 @@
 import { db } from "./sqliteDb";
 import { Alert, AlertState } from "../../domain/entities";
+import { IAlertRepository } from "../../domain/repositories/alertRepositiory.interface";
 
-export class SqliteAlertRepository {
+export class SqliteAlertRepository implements IAlertRepository {
   public async create(alert: Omit<Alert, "alertId">): Promise<void> {
     const query = db.prepare(`
       INSERT INTO alerts (deviceId, state, triggerValue, startedAt, acknowledgedAt, resolvedAt, createdAt)
@@ -43,17 +44,65 @@ export class SqliteAlertRepository {
     };
   }
 
-  public async acknowledge(
-    alertId: number,
-    acknowledgedAt: Date,
-  ): Promise<void> {
+  public async findAllByDevice(deviceId: string): Promise<Alert[]> {
     const query = db.prepare(`
-      UPDATE alerts
-      SET state = 'ACKNOWLEDGED', acknowledgedAt = ?
-      WHERE alertId = ? AND state = 'ACTIVE'
+    SELECT *
+    FROM alerts
+    WHERE deviceId = ?
+    ORDER BY createdAt DESC
+  `);
+
+    const rows = query.all(deviceId) as Alert[];
+
+    return rows;
+  }
+
+  // public async acknowledge(
+  //   alertId: number,
+  //   acknowledgedAt: Date,
+  // ): Promise<void> {
+  //   const query = db.prepare(`
+  //     UPDATE alerts
+  //     SET state = 'ACKNOWLEDGED', acknowledgedAt = ?
+  //     WHERE alertId = ? AND state = 'ACTIVE'
+  //   `);
+
+  //   query.run(acknowledgedAt.toISOString(), alertId);
+  // }
+
+  public async acknowledgeByDeviceId(deviceId: string): Promise<Alert | null> {
+    const findQuery = db.prepare(`
+      SELECT *
+      FROM alerts
+      WHERE deviceId = ? AND state = 'ACTIVE'
+      ORDER BY createdAt DESC
+      LIMIT 1
     `);
 
-    query.run(acknowledgedAt.toISOString(), alertId);
+    const updateQuery = db.prepare(`
+      UPDATE alerts
+      SET state = 'ACKNOWLEDGED', acknowledgedAt = ?
+      WHERE alertId = ?
+    `);
+
+    const runTransaction = db.transaction(() => {
+      const alert = findQuery.get(deviceId) as Alert | undefined;
+
+      if (!alert) {
+        return null;
+      }
+
+      const now = new Date();
+      updateQuery.run(now.toISOString(), alert.alertId);
+
+      return {
+        ...alert,
+        state: "ACKNOWLEDGED",
+        acknowledgedAt: now,
+      } as Alert;
+    });
+
+    return runTransaction();
   }
 
   public async resolve(alertId: number, resolvedAt: Date): Promise<void> {

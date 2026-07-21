@@ -3,6 +3,8 @@ import { SilenceBuzzerUseCase } from "../../../application/use-cases/silenceDevi
 import { UpdateDeviceConfigUseCase } from "../../../application/use-cases/updateDeviceConfig.use-case";
 import { GetDeviceStateUseCase } from "../../../application/use-cases/getDeviceState.use-case";
 import { GetDevicesUseCase } from "../../../application/use-cases/getDevicesList.use-case";
+import { GetDeviceConfigUseCase } from "../../../application/use-cases/getDeviceConfiguration.use-case";
+import { GetDeviceAlertsUseCase } from "../../../application/use-cases/getDeviceAlerts.use-case";
 
 export class DeviceController {
   constructor(
@@ -10,6 +12,8 @@ export class DeviceController {
     private updateConfigUseCase: UpdateDeviceConfigUseCase,
     private getDeviceStateUseCase: GetDeviceStateUseCase,
     private getDevicesUseCase: GetDevicesUseCase,
+    private getDeviceConfigUseCase: GetDeviceConfigUseCase,
+    private getDeviceAlertsUseCase: GetDeviceAlertsUseCase,
   ) {}
 
   public silenceBuzzer = async (req: Request, res: Response): Promise<void> => {
@@ -124,6 +128,52 @@ export class DeviceController {
       res.status(500).json({
         success: false,
         message: "Error fetching devices list",
+        error: error.message,
+      });
+    }
+  };
+
+  public getDeviceConfiguration = async (
+    req: Request,
+    res: Response,
+  ): Promise<void> => {
+    try {
+      const { deviceId } = req.params;
+
+      const deviceConfiguration = await this.getDeviceConfigUseCase.execute(
+        deviceId as string,
+      );
+      res.json({
+        success: true,
+        deviceConfiguration,
+      });
+    } catch (error: any) {
+      res.status(500).json({
+        success: false,
+        message: "Error fetching devices list",
+        error: error.message,
+      });
+    }
+  };
+
+  public getDeviceAlerts = async (
+    req: Request,
+    res: Response,
+  ): Promise<void> => {
+    try {
+      const { deviceId } = req.params;
+
+      const deviceAlerts = await this.getDeviceAlertsUseCase.execute(
+        deviceId as string,
+      );
+      res.json({
+        success: true,
+        deviceAlerts,
+      });
+    } catch (error: any) {
+      res.status(500).json({
+        success: false,
+        message: "Error fetching devices alerts",
         error: error.message,
       });
     }

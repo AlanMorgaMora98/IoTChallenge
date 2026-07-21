@@ -4,6 +4,8 @@ import { SqliteAlertRepository } from "../infrastructure/persistence/sqliteAlert
 import { TelemetryReading, AlertState } from "../domain/entities";
 
 export class AlertService {
+  private deviceQueues = new Map<string, Promise<void>>();
+
   constructor(
     private telemetryRepo: ITelemetryRepository,
     private alertRepo: SqliteAlertRepository,
@@ -12,89 +14,101 @@ export class AlertService {
 
   public async processNewTelemetry(reading: TelemetryReading): Promise<void> {
     const { deviceId } = reading;
+    const currentQueue = this.deviceQueues.get(deviceId) || Promise.resolve();
+
+    const nextQueue = currentQueue.then(async () => {
+      try {
+        await this.executeAlertEvaluation(reading);
+      } catch (error) {
+        console.error(
+          `[AlertService - ${deviceId}] Error processing telemetry:`,
+          error,
+        );
+      }
+    });
+
+    this.deviceQueues.set(deviceId, nextQueue);
+    return nextQueue;
+  }
+
+  private async executeAlertEvaluation(
+    reading: TelemetryReading,
+  ): Promise<void> {
+    const { deviceId } = reading;
 
     const config = await this.configRepo.getByDeviceId(deviceId);
     if (!config) {
-      console.log(
-        `⚠️ [AlertService] No se encontró configuración de alertas para el dispositivo: ${deviceId}. Se omite evaluación.`,
-      );
+      console.log(`[AlertService] No configuration: ${deviceId}.`);
       return;
     }
 
-    const windowMs = config.windowMinutes * 60 * 1000;
-    const cutoffTime = new Date(reading.timestamp.getTime() - windowMs);
+    const latestTimestamp =
+      (await this.telemetryRepo.getLatestTimestamp(deviceId)) ??
+      reading.timestamp;
 
-    // 3. Traer de la base de datos ÚNICAMENTE las lecturas que caen en esa ventana de tiempo
+    const windowMs = config.windowMinutes * 60 * 1000;
+    const cutoffTime = new Date(latestTimestamp.getTime() - windowMs);
+
     const windowReadings = await this.telemetryRepo.getReadingsSince(
       deviceId,
       cutoffTime,
     );
+    if (windowReadings.length === 0) return;
 
-    const totalReadings = windowReadings.length;
-    if (totalReadings === 0) return;
-
-    //COLD START
-    const expectedReadingsInWindow =
+    const totalCycleSamples =
       (config.windowMinutes * 60) / config.intervalSeconds;
+    const minOkFraction =
+      config.minRequiredOkPercentage > 1
+        ? config.minRequiredOkPercentage / 100
+        : config.minRequiredOkPercentage;
+    const maxAllowedBadSamples = totalCycleSamples * (1 - minOkFraction);
 
-    if (totalReadings < expectedReadingsInWindow) {
-      console.log(
-        `⏳ [Warm-up - ${deviceId}] Esperando a completar la ventana de tiempo. ` +
-          `Lecturas: ${totalReadings}/${expectedReadingsInWindow} acumuladas.`,
-      );
-      return;
-    }
-    // =========================================================================
-
-    // 4. Calcular cuántas de estas lecturas están dentro del rango óptimo de temperatura
-    const okReadingsCount = windowReadings.filter(
-      (r) =>
-        r.temperatureC >= config.minTemp && r.temperatureC <= config.maxTemp,
+    const badReadingsCount = windowReadings.filter(
+      (r) => r.temperatureC < config.minTemp || r.temperatureC > config.maxTemp,
     ).length;
 
-    // Porcentaje de estabilidad real en la ventana de tiempo
-    const okPercentage = (okReadingsCount / totalReadings) * 100;
-
-    console.log(`📊 [Evaluando - ${deviceId}]`);
-    console.log(
-      `   └─ Temperatura actual: ${reading.temperatureC}°C (Rango óptimo: ${config.minTemp}°C - ${config.maxTemp}°C)`,
-    );
-    console.log(
-      `   └─ Muestras reales en ventana de ${config.windowMinutes} min: ${totalReadings} lecturas`,
-    );
-    console.log(
-      `   └─ Estabilidad de la carga: ${okPercentage.toFixed(1)}% (Mínimo requerido: ${config.minRequiredOkPercentage}%)`,
-    );
-
-    // 5. Gestión de Alertas (Active / Resolved)
+    const isThermalViolation = badReadingsCount > maxAllowedBadSamples;
     const activeAlert = await this.alertRepo.findActiveByDevice(deviceId);
 
-    if (okPercentage < config.minRequiredOkPercentage) {
+    if (isThermalViolation) {
       if (!activeAlert) {
         console.warn(
-          `🚨 [NEW ALERT] ¡device ${deviceId} cayó al ${okPercentage.toFixed(1)}%!`,
+          `🚨 [NEW ALERT - ${deviceId}] Temperature out of range ` +
+            `(${badReadingsCount} / ${maxAllowedBadSamples.toFixed(2)} allowed).`,
         );
         await this.alertRepo.create({
           deviceId,
           state: AlertState.ACTIVE,
           triggerValue: reading.temperatureC,
-          startedAt: reading.timestamp,
+          startedAt: latestTimestamp,
           acknowledgedAt: null,
           resolvedAt: null,
-          createdAt: reading.timestamp,
+          createdAt: latestTimestamp,
         });
       } else {
-        console.log(
-          `⚠️ [Alerta Activa] El dispositivo ${deviceId} continúa fuera de estabilidad (${okPercentage.toFixed(1)}%).`,
-        );
+        console.log(`⚠️ [Alert ACTIVE - ${deviceId}] out of stability.`);
       }
-    } else {
-      if (activeAlert) {
-        console.log(
-          `✅ [ALERTA AUTO-RESUELTA] El clima en ${deviceId} se ha normalizado. Estabilidad recuperada al ${okPercentage.toFixed(1)}%.`,
-        );
-        await this.alertRepo.resolve(activeAlert.alertId!, reading.timestamp);
-      }
+      return;
+    }
+
+    if (!activeAlert) return;
+
+    const recoveryStreak = Math.max(1, Math.round(totalCycleSamples));
+    const recentReadings = await this.telemetryRepo.getRecentReadings(
+      deviceId,
+      recoveryStreak,
+    );
+
+    const hasRecovered =
+      recentReadings.length >= recoveryStreak &&
+      recentReadings.every(
+        (r) =>
+          r.temperatureC >= config.minTemp && r.temperatureC <= config.maxTemp,
+      );
+
+    if (hasRecovered) {
+      console.log(`✅ [ALERT RESOLVED - ${deviceId}] Temperature stabilized.`);
+      await this.alertRepo.resolve(activeAlert.alertId!, latestTimestamp);
     }
   }
 }
