@@ -62,32 +62,6 @@ export class AzureTwinService implements IDeviceTwinService {
     }
   }
 
-  // public async silenceBuzzer(deviceId: string): Promise<void> {
-  //   try {
-  //     console.log(`🌐 [Twin] Silencing buzzer...: ${deviceId}...`);
-
-  //     const response = await this.registry.getTwin(deviceId);
-  //     const twin = response.responseBody;
-
-  //     const patch = {
-  //       properties: {
-  //         desired: {
-  //           buzzerEnabled: false,
-  //         },
-  //       },
-  //     };
-
-  //     await this.registry.updateTwin(deviceId, patch, twin.etag);
-  //     console.log(`✅ [Twin] Succesful `);
-  //   } catch (error: any) {
-  //     console.error(
-  //       `❌ [Twin] Error al intentar silenciar el buzzer:`,
-  //       error.message,
-  //     );
-  //     throw error;
-  //   }
-  // }
-
   public async silenceBuzzer(deviceId: string): Promise<any> {
     console.log(`🌐 [Twin] Silencing buzzer...: ${deviceId}...`);
 

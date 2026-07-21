@@ -21,7 +21,7 @@ export class AzureIoTHubListener {
 
     if (!connectionString) {
       console.warn(
-        "⚠️ [IoT Hub] Not founded: IOTHUB_EVENT_HUBS_CONNECTION_STRING not defined in .env",
+        "[IoT Hub] Not founded: IOTHUB_EVENT_HUBS_CONNECTION_STRING not defined in .env",
       );
     }
 
@@ -46,7 +46,7 @@ export class AzureIoTHubListener {
 
               if (!deviceId) {
                 console.warn(
-                  '⚠️ [IoT Hub] Recibido mensaje sin metadatos de "iothub-connection-device-id". Se ignora.',
+                  '[IoT Hub] empty meesage "iothub-connection-device-id".',
                 );
                 continue;
               }
@@ -56,7 +56,7 @@ export class AzureIoTHubListener {
                   ? JSON.parse(event.body)
                   : event.body;
 
-              console.log(`📥 [IoT Hub] Mensaje recibido de '${deviceId}':`);
+              console.log(`[IoT Hub] message from '${deviceId}':`);
               console.log(
                 `   └─ Temp: ${payload.temperatureC}°C | Hum: ${payload.humidityPct}% | Buzzer: ${payload.buzzerActive} | Seq: ${payload.sequenceNumber} | DATETIME | ${payload.timestamp}`,
               );
@@ -98,11 +98,11 @@ export class AzureIoTHubListener {
   }
 
   public async stop(): Promise<void> {
-    console.log("🔌 [Azure IoT Hub] Closing...");
+    console.log("[Azure IoT Hub] Closing...");
     if (this.subscription) {
       await this.subscription.close();
     }
     await this.client.close();
-    console.log("✔ [Azure IoT Hub] CLOSED.");
+    console.log("[Azure IoT Hub] CLOSED.");
   }
 }

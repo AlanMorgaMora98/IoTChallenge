@@ -2,12 +2,14 @@ import { Request, Response } from "express";
 import { SilenceBuzzerUseCase } from "../../../application/use-cases/silenceDeviceBuzzer.use-case";
 import { UpdateDeviceConfigUseCase } from "../../../application/use-cases/updateDeviceConfig.use-case";
 import { GetDeviceStateUseCase } from "../../../application/use-cases/getDeviceState.use-case";
+import { GetDevicesUseCase } from "../../../application/use-cases/getDevicesList.use-case";
 
 export class DeviceController {
   constructor(
     private silenceBuzzerUseCase: SilenceBuzzerUseCase,
     private updateConfigUseCase: UpdateDeviceConfigUseCase,
     private getDeviceStateUseCase: GetDeviceStateUseCase,
+    private getDevicesUseCase: GetDevicesUseCase,
   ) {}
 
   public silenceBuzzer = async (req: Request, res: Response): Promise<void> => {
@@ -27,7 +29,7 @@ export class DeviceController {
       });
     } catch (error: any) {
       console.error(
-        "❌ Error on DeviceController (silenceBuzzer):",
+        "Error on DeviceController (silenceBuzzer):",
         error.message,
       );
       res.status(504).json({
@@ -75,10 +77,7 @@ export class DeviceController {
         message: `Configuration for device ${deviceId} has been saved and synchronized successfully.`,
       });
     } catch (error: any) {
-      console.error(
-        "❌ Error on DeviceController (updateConfig):",
-        error.message,
-      );
+      console.error("Error on DeviceController (updateConfig):", error.message);
       res.status(500).json({
         success: false,
         message: error.message || "Error processing the configuration update.",
@@ -108,6 +107,24 @@ export class DeviceController {
       res.status(504).json({
         success: false,
         message: "The hardware did not respond in time or is disconnected.",
+      });
+    }
+  };
+
+  public getDevices = async (_req: Request, res: Response): Promise<void> => {
+    try {
+      const devices = await this.getDevicesUseCase.execute();
+      console.log(devices);
+      res.json({
+        success: true,
+        count: devices.length,
+        data: devices,
+      });
+    } catch (error: any) {
+      res.status(500).json({
+        success: false,
+        message: "Error fetching devices list",
+        error: error.message,
       });
     }
   };
