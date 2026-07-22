@@ -34,7 +34,6 @@ export class AzureIoTHubListener {
     this.client = new EventHubConsumerClient(consumerGroup, connectionString);
 
     this.io.on("connection", (socket) => {
-      console.log(`[Socket.io] Nuevo cliente conectado: ${socket.id}`);
       socket.emit(
         "device:initial_active_buzzers",
         Array.from(this.activeBuzzers),
