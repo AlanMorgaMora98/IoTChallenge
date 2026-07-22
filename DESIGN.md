@@ -1,4 +1,5 @@
 # ARCHITECTURE DIAGRAM
+![architecture diagram](images/Architecture_cold_chain_monitor.png)
 
 # ASSUMPTIONS
 
@@ -30,15 +31,24 @@ To operate correctly, each device should be provisioned with an initial configur
   - **MEDIUM** (75%)
   - **HIGH** (85%)
 
+- **Early Alert Detection (Cold Start Optimization)**: During startup, the evaluation buffer is initially empty and measurements are collected continuously. Because the telemetry interval and evaluation window duration are known, the device can determine the total number of measurements expected within the evaluation period. Based on the configured **Sensitivity Level**, it also calculates the minimum number of measurements that must remain within the configured operating range.
+- Rather than always waiting for the evaluation window to finish, the device continuously evaluates whether it is still mathematically possible to satisfy the configured sensitivity threshold. If the number of out-of-range measurements exceeds the maximum allowed, the alert is generated immediately because the required percentage of valid measurements can no longer be achieved, even if all remaining measurements are within range.
+
+> For example, with a **3-minute** evaluation window and a **10-second** telemetry interval, the device expects **18 measurements**. With a **75% sensitivity level**, at least **14 measurements** must remain within the configured range. Therefore, the device can tolerate at most **4 out-of-range measurements**. As soon as the fifth out-of-range measurement is received, an alert is raised immediately without waiting for the rest of the evaluation window.
+
 This logic is executed locally by the agent, operating autonomously and **activate the buzzer even when the device is offline or temporarily disconnected** from the network or server is down.
 
-> When the device starts operating, it retrieves the available configuration from the Device Twin and applies it to its internal logic. This allows the device to dynamically adapt its behavior based on the configuration defined remotely without requiring manual changes or firmware updates.
+> When the device starts operating, it **retrieves the available configuration from the Device Twin and applies it** to its internal logic. This allows the device to dynamically adapt its behavior based on the configuration defined remotely without requiring manual changes or firmware updates.
 
 ### UTC Timestamp Standardization
 
 The device was configured to provide timestamps in **UTC format** instead of local time. Previously, the device generated telemetry timestamps using local time, which could introduce inconsistencies when processing data across different services, time zones, or when correlating events from multiple sources.
 
 Using UTC as the standard ensures that telemetry data, alerts, logs, and other system events use a consistent time reference across the entire platform.
+
+> ## Alert States
+
+![alerts state](images/AlertStates.drawio.png)
 
 > ## Server (Back-end)
 
@@ -51,6 +61,8 @@ To address this situation, the server implements an evaluation process using the
 Additionally, the system stores all received telemetry data to support future reporting capabilities and allow users to analyze device behavior, sensor trends, and temperature patterns over time. This historical data is essential for identifying anomalies, evaluating device performance, and supporting maintenance decisions. Considering the nature of IoT environments, where messages can occasionally arrive duplicated, delayed, or out of order, a database validation rule was implemented to prevent duplicate telemetry records from being stored. This ensures that each measurement is registered only once, maintaining data integrity and preventing inaccurate reports, duplicated alerts, or unexpected behavior during data analysis. This approach improves the reliability of the monitoring platform and ensures that operational decisions are based on accurate information.
 
 The server includes a web API developed to expose the system's use cases through well-defined endpoints, allowing external services and applications to integrate with the platform. This API acts as an interface between the backend logic and other consumers, providing controlled access to functionalities such as device management, telemetry retrieval, alert information, and configuration operations, this approach maintains a clear separation between the internal business logic and external consumers, improving maintainability, scalability, and security by controlling how data and operations are accessed
+
+![api endpoints](images/IoT_API_diagram.drawio.png)
 
 - The server follows the principles of *Clean Architecture* to ensure a clear separation of concerns between layers. By decoupling the components, new features and changes can be introduced with minimal impact on the rest of the system, making the codebase easier to evolve and maintain.
 
@@ -69,7 +81,6 @@ The application also follows a clear separation of responsibilities by abstracti
 - WebSockets were implemented to provide real-time communication between the backend and the web application. This was a critical architectural decision because one of the primary use cases is the ability to remotely silence a device's buzzer. To support this functionality, the application must continuously monitor the current state of each device and immediately notify operators whenever the buzzer is activated in the web app. This approach reduces unnecessary network traffic compared to periodic polling and provides a more efficient and scalable solution for real-time monitoring allowing operators to immediately identify which device requires attention.
 
 - Configuration device form with predefined options was implemented to prevent users from creating invalid or impractical device configurations that could lead to unexpected system behavior. Instead of allowing unrestricted input, users select from carefully designed configuration values that align with the operational requirements. The *Evaluation Time* is limited to appropriate values to ensure that temperature measurements are evaluated frequently enough to detect abnormal conditions in a timely manner. Allowing excessively long evaluation windows could delay alert generation and reduce the effectiveness of the monitoring process.
-- The web application provides three predefined sensitivity levels—High, Medium, and Low, estricting configuration to validated options, the system becomes more reliable, easier to operate, and less prone to misconfiguration
 
 > ## Database design
 
@@ -77,9 +88,8 @@ SQLite was chosen for this coding exercise due to its lightweight nature, simpli
 
 As the volume of telemetry and application data grows, it is recommended to migrate to a more scalable database (maybe a cloud database) solution capable of handling higher write throughput, larger datasets, and increased concurrency. This would improve overall performance, reduce resource consumption on the application server, and better support future scalability requirements
 
-The database diagram:
-
-Database to save alerts, telemetry and devices configurations
+### DB diagram
+![database diagram](images/IoT_database_schema.png)
 
 
 # SECURITY CONSIDERATIONS
@@ -104,13 +114,14 @@ Database to save alerts, telemetry and devices configurations
   - **Advantages:** Immediate execution, synchronous response, and confirmation of command success or failure.
   - **Disadvantages:** The device must be online and connected to Azure IoT Hub when the method is invoked. If the device is offline, the command cannot be executed, unlike queued cloud-to-device messages that can be delivered later.
 
+  ![direct method to silence buzzer](images/directMethod_silenceBuzzer.drawio.png)
+
 ## Sqlite
 - **sqlite** was selected because the project is intended as a lightweight demo and can be run without installing a database server.
-  - Limited concurrent writes.
-  - Not suitable for high-volume production telemetry.
-  - Would likely be replaced with PostgreSQL or Azure SQL in production.
+  - **Advantages:** Simple deployment, zero configuration, low resource consumption, and excellent performance for small to medium workloads.
+  - **Disadvantages:** Limited support for concurrent write operations and horizontal scaling. For a production environment with a large number of devices or high telemetry volume, a database such as PostgreSQL, Azure SQL, or another scalable solution would be more appropriate.
 
-## Configuration persistence and device twins
+## Configuration persistence and Device Twins
 - Device configurations are persisted in the application's database and synchronized to Azure IoT Hub using **Device Twin desired properties**. The database serves as the system of record for the web application, while Device Twins ensure that devices receive the latest configuration whenever they are connected.
   - **Advantages:** Centralized configuration management, persistent history, and automatic synchronization through Device Twins without requiring the device to be continuously online. Devices can retrieve pending configuration updates after reconnecting.
   - **Disadvantages:** Configuration changes are not applied instantly, as synchronization depends on Azure IoT Hub and the device reporting its updated twin. This also introduces the need to keep the database and Device Twin synchronized to avoid temporary inconsistencies.
@@ -138,3 +149,5 @@ Database to save alerts, telemetry and devices configurations
  - Create a reporting section where users can view metrics through interactive charts to better **understand the behavior of the device and its sensors**.
 
  - Create technical reports that detect continuous fluctuations in a device. These reports can help **identify whether a sensor is malfunctioning, requires maintenance, or is being affected by external factors**.
+
+ - It is recommended to **implement email and SMS/text notifications** whenever the buzzer is active. These alert triggers should be fully configurable. For example: If a device emits 3 alerts within a 30-minute window, trigger an automated notification dispatch via a messaging app.
