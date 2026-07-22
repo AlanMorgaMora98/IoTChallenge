@@ -118,7 +118,7 @@ export class DeviceController {
   public getDevices = async (_req: Request, res: Response): Promise<void> => {
     try {
       const devices = await this.getDevicesUseCase.execute();
-      console.log(devices);
+      //console.log(devices);
       res.json({
         success: true,
         count: devices.length,

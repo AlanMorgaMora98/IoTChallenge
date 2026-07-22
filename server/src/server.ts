@@ -47,9 +47,7 @@ const iotHubListener = new AzureIoTHubListener(telemetryRepo, alertService, io);
 const startServer = async () => {
   try {
     httpServer.listen(PORT, () => {
-      console.log(
-        `🚀 [Servidor] Backend corriendo en http://localhost:${PORT}`,
-      );
+      console.log(`[SERVER] Backend running on http://localhost:${PORT}`);
     });
 
     iotHubListener.startListening();

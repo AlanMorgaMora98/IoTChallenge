@@ -90,7 +90,7 @@ try {
       5.0, // tempMin
       8.0, // tempMax
       3, // windowMinutes
-      15, // intervalSeconds
+      5, // intervalSeconds
       75.0, // minRequiredOkPercentage
     );
 
